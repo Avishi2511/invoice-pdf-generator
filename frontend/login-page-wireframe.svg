@@ -1,0 +1,18 @@
+<svg width="600" height="420" xmlns="http://www.w3.org/2000/svg">
+  <!-- Navbar -->
+  <rect x="0" y="0" width="600" height="60" fill="#f3f4f6" />
+  <text x="30" y="38" font-size="24" font-family="Arial" font-weight="bold">Logo</text>
+  <text x="500" y="38" font-size="18" font-family="Arial">Sign Up</text>
+  
+  <!-- Login Form -->
+  <rect x="100" y="100" width="400" height="240" fill="#fff" stroke="#cbd5e1" rx="12"/>
+  <text x="230" y="140" font-size="24" font-family="Arial" font-weight="bold">Log In</text>
+  <text x="140" y="180" font-size="16" font-family="Arial">Email</text>
+  <rect x="220" y="165" width="220" height="28" fill="#f3f4f6" stroke="#cbd5e1"/>
+  <text x="140" y="220" font-size="16" font-family="Arial">Password</text>
+  <rect x="220" y="205" width="220" height="28" fill="#f3f4f6" stroke="#cbd5e1"/>
+  <rect x="180" y="260" width="240" height="40" rx="8" fill="#2563eb"/>
+  <text x="260" y="288" font-size="18" font-family="Arial" fill="#fff">Log In</text>
+  <text x="180" y="320" font-size="14" font-family="Arial"><tspan fill="#2563eb">Forgot Password?</tspan></text>
+  <text x="180" y="340" font-size="14" font-family="Arial">Don't have an account? <tspan fill="#2563eb">Sign Up</tspan></text>
+</svg>

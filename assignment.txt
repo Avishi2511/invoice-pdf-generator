@@ -1,0 +1,114 @@
+Your task is to build a proof-of-concept for a service that allows users to generate 
+PDF invoices.
+The core challenge is not just to create a PDF, but to design a system that can 
+handle this potentially resource-intensive task in a scalable and secure way, 
+ensuring a smooth user experience and a stable backend.
+Technology Stack:
+Frontend: React/Next.js with Tailwind CSS
+Backend: Node.js/Express.js
+Database: MongoDB
+You are free to use any libraries within this ecosystem that you see fit.
+2. Core Requirements: What to Build
+Your application must have the following functionality:
+[ ] User Authentication: Users must be able to sign up and log in. 
+Unauthenticated users should not be able to access the dashboard.
+[ ] Invoice Dashboard: An authenticated user should see a dashboard 
+where they can:
+Fill out a simple form to create a new invoice (e.g., Client Name, a list 
+of line items with description/price, etc.).
+Click a "Generate PDF" button.
+[ ] Asynchronous Generation Flow:
+When "Generate PDF" is clicked, the UI must not freeze. The new 
+invoice should appear in a list on the dashboard immediately with a 
+Processing... status.
+The actual PDF generation must happen in the background on the 
+server.
+[ ] Real-time Status Updates:
+Once the PDF is generated, the invoice's status on the dashboard 
+should automatically update to Ready without the user needing to 
+refresh the page.
+A "Download" link should appear next to the ready invoice.
+[ ] Secure, Authenticated Downloads:
+The download link must be secure. A user must only be able to 
+download invoices that they created.
+●
+●
+●
+1.
+2.
+3.
+○
+○
+○
+4.
+○
+○
+○
+1.
+○
+3. Architectural Focus Areas: What to Think About
+As you build, please pay special attention to these three architectural challenges. 
+We will specifically ask you about them.
+Scalable Task Handling: PDF generation can be slow and use a lot of 
+server resources. How do you prevent a single user generating a large 
+PDF from blocking the entire server and affecting other users?
+System Stability & Abuse Prevention: How do you prevent a malicious 
+user or a script from overwhelming the service by requesting hundreds of 
+PDFs at once? We'd like you to implement a simple rate limit of 5 PDF 
+generations per user, per minute.
+Data Security & Tenancy: How do you ensure that the data (and the 
+generated PDFs) for User A are completely inaccessible to User B?
+4. Deliverables: What to Submit
+Please provide the following within 24 hours:
+A Link to a Live, Working Demo: Deployed on a free service like Vercel 
+(for the frontend) and MongoDB Atlas (for the database).
+A Link to the Source Code: A public GitHub repository containing all your 
+frontend and backend code.
+A Detailed README.md File: Your README.md in the GitHub repo is 
+crucial. It should contain:
+A brief overview of the project.
+Clear instructions on how to set up and run the project locally.
+An "Architectural Decisions" section where you answer the questions 
+from the Evaluation Criteria below.
+A 5-Minute Video Walkthrough: Please record a short video (using Loom 
+or a similar tool) that includes:
+A brief demonstration of the final application in action (signing up, 
+creating an invoice, and seeing the status update automatically).
+A quick walkthrough of your code, highlighting where you 
+implemented the key architectural components (e.g., the background 
+job logic, the rate limiter, the security check for downloads).
+A verbal explanation of the "why" behind your major technical 
+decisions.
+5. Evaluation Criteria
+We will be evaluating your submission based on the following, which you should 
+also use as a guide for your README.md and video:
+System Design & Architecture (Most Important):
+Question: Describe the end-to-end flow from a user clicking 
+○
+2.
+○
+3.
+○
+○
+4.
+○
+5.
+○
+"Generate PDF" to the file being ready. Is this process synchronous or 
+asynchronous? Explain your architectural choice and why it's critical 
+for this service.
+Security & Robustness:
+Question: Explain, step-by-step, how your system ensures User A 
+cannot download an invoice belonging to User B. How did you 
+implement the rate-limiting, and how would your solution handle 
+scaling to multiple servers?
+Code Quality & Best Practices:
+Is the code clean, organized, and easy to understand?
+Did you separate concerns effectively between the frontend, 
+backend, and any background processes?
+User Experience:
+Does the application work as expected? Is the asynchronous flow 
+smooth for the user?
+Communication:
+How clearly do you explain your decisions in the README.md and 
+video

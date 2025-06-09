@@ -1,0 +1,28 @@
+<svg width="600" height="500" xmlns="http://www.w3.org/2000/svg">
+  <!-- Navbar -->
+  <rect x="0" y="0" width="600" height="60" fill="#f3f4f6" />
+  <text x="30" y="38" font-size="24" font-family="Arial" font-weight="bold">Logo</text>
+  <text x="500" y="38" font-size="18" font-family="Arial">Dashboard</text>
+  <text x="400" y="38" font-size="18" font-family="Arial">Logout</text>
+  
+  <!-- Profile Info -->
+  <rect x="100" y="80" width="400" height="80" fill="#fff" stroke="#cbd5e1" rx="12"/>
+  <text x="120" y="110" font-size="18" font-family="Arial" font-weight="bold">Profile</text>
+  <text x="120" y="140" font-size="16" font-family="Arial">Email: user@email.com</text>
+  
+  <!-- Change Password -->
+  <rect x="100" y="180" width="400" height="120" fill="#fff" stroke="#cbd5e1" rx="12"/>
+  <text x="120" y="210" font-size="18" font-family="Arial" font-weight="bold">Change Password</text>
+  <text x="120" y="240" font-size="14" font-family="Arial">Current Password</text>
+  <rect x="250" y="225" width="200" height="22" fill="#f3f4f6" stroke="#cbd5e1"/>
+  <text x="120" y="270" font-size="14" font-family="Arial">New Password</text>
+  <rect x="250" y="255" width="200" height="22" fill="#f3f4f6" stroke="#cbd5e1"/>
+  <text x="120" y="300" font-size="14" font-family="Arial">Confirm New Password</text>
+  <rect x="250" y="285" width="200" height="22" fill="#f3f4f6" stroke="#cbd5e1"/>
+  
+  <!-- Danger Zone -->
+  <rect x="100" y="340" width="400" height="80" fill="#fef2f2" stroke="#fecaca" rx="12"/>
+  <text x="120" y="370" font-size="18" font-family="Arial" font-weight="bold" fill="#b91c1c">Danger Zone</text>
+  <rect x="120" y="390" width="180" height="32" rx="8" fill="#ef4444"/>
+  <text x="140" y="412" font-size="16" font-family="Arial" fill="#fff">Delete Account</text>
+</svg>
