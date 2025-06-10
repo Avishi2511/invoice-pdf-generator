@@ -91,11 +91,27 @@ const Signup: React.FC<SignupProps> = ({ onSignup }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      // For demo purposes, directly call onSignup
-      onSignup();
+      try {
+        const res = await fetch('http://localhost:5000/api/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          onSignup(); // Go to dashboard
+        } else {
+          setErrors(prev => ({ ...prev, api: data.message || 'Signup failed' }));
+        }
+      } catch (err) {
+        setErrors(prev => ({ ...prev, api: 'Network error' }));
+      }
     }
   };
 

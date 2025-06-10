@@ -13,6 +13,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     rememberMe: false
   });
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [apiError, setApiError] = useState('');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -44,11 +45,28 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      // For demo purposes, directly call onLogin
-      onLogin();
+      try {
+        const res = await fetch('http://localhost:5000/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setApiError('');
+          onLogin();
+        } else {
+          setApiError(data.message || "Don't have an account?");
+        }
+      } catch (err) {
+        setApiError('Network error');
+      }
     }
   };
 
@@ -208,6 +226,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </a>
             </p>
           </div>
+          {apiError && (
+            <p className="mt-2 text-sm text-red-400 animate-fade-in">{apiError}</p>
+          )}
         </div>
 
         {/* Security Notice */}

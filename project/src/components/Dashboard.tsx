@@ -132,39 +132,32 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
         <nav className="flex-1 p-4">
           <div className="space-y-2">
             <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                activeTab === 'dashboard'
-                  ? 'bg-purple-600 text-white shadow-lg'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-              }`}
+              onClick={onNavigateToHome}
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-gray-300 hover:bg-gray-700 hover:text-white"
             >
               <FileText className="h-5 w-5" />
-              <span>Dashboard</span>
+              <span>Home</span>
             </button>
-            
             <button
               onClick={onNavigateToInvoices}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                activeTab === 'invoices'
-                  ? 'bg-purple-600 text-white shadow-lg'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-              }`}
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 bg-purple-600 text-white shadow-lg"
             >
               <FileText className="h-5 w-5" />
-              <span>My Invoices</span>
+              <span>Invoices</span>
             </button>
-            
             <button
-              onClick={() => setActiveTab('settings')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                activeTab === 'settings'
-                  ? 'bg-purple-600 text-white shadow-lg'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-              }`}
+              onClick={onNavigateToSettings}
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-gray-300 hover:bg-gray-700 hover:text-white"
             >
               <Settings className="h-5 w-5" />
               <span>Settings</span>
+            </button>
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-red-400 hover:bg-red-700 hover:text-white"
+            >
+              <LogOut className="h-5 w-5" />
+              <span>Logout</span>
             </button>
           </div>
         </nav>
@@ -409,22 +402,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
             </div>
           </div>
         </main>
-      </div>
-
-      {/* Navigation Buttons */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        <button onClick={onNavigateToHome} className="px-4 py-2 bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700 transition-all duration-200">
-          Home
-        </button>
-        <button onClick={onNavigateToInvoices} className="px-4 py-2 bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700 transition-all duration-200">
-          Invoices
-        </button>
-        <button onClick={onNavigateToSettings} className="px-4 py-2 bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700 transition-all duration-200">
-          Settings
-        </button>
-        <button onClick={onLogout} className="px-4 py-2 bg-red-600 text-white rounded-lg shadow-md hover:bg-red-700 transition-all duration-200">
-          Logout
-        </button>
       </div>
     </div>
   );
