@@ -105,6 +105,7 @@ const Signup: React.FC<SignupProps> = ({ onSignup }) => {
         });
         const data = await res.json();
         if (res.ok) {
+          localStorage.setItem('userId', data.user.id);
           onSignup(); // Go to dashboard
         } else {
           setErrors(prev => ({ ...prev, api: data.message || 'Signup failed' }));

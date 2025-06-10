@@ -1,29 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  FileText, 
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
-  Eye, 
-  Trash2, 
-  Edit, 
-  User, 
-  Settings, 
-  LogOut,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  X,
-  ChevronDown
-} from 'lucide-react';
+  FileText, Plus, Search, Filter, Download, Eye, Trash2, Edit, User, Settings, LogOut,
+  CheckCircle, Clock, AlertCircle, X, ChevronDown} 
+from 'lucide-react';
 
 interface Invoice {
-  id: string;
-  client: string;
-  date: string;
-  amount: number;
+  _id: string;
+  clientName: string;
+  clientEmail?: string;
+  items: Array<{
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }>;
   status: 'ready' | 'processing' | 'error';
+  createdAt?: string;
+  updatedAt?: string;
+  pdfUrl?: string;
 }
 
 interface LineItem {
@@ -42,22 +36,77 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, onNavigateToSettings, onNavigateToHome }) => {
-  const [activeTab, setActiveTab] = useState('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
-  const [lineItems, setLineItems] = useState<LineItem[]>([
-    { id: '1', description: 'Web Development', quantity: 10, unitPrice: 100, total: 1000 },
-    { id: '2', description: 'Design Services', quantity: 5, unitPrice: 80, total: 400 }
-  ]);
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [clientInfo, setClientInfo] = useState({
     name: '',
     email: ''
   });
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [currentStatus, setCurrentStatus] = useState<'idle' | 'creating' | 'processing' | 'ready' | 'error'>('idle');
+  const [currentInvoiceId, setCurrentInvoiceId] = useState<string | null>(null);
 
-  const [invoices] = useState<Invoice[]>([
-    { id: 'INV-001', client: 'ABC Corp', date: 'Dec 1', amount: 1200, status: 'ready' },
-    { id: 'INV-002', client: 'XYZ Ltd', date: 'Dec 8', amount: 1540, status: 'processing' },
-    { id: 'INV-003', client: 'Tech Co', date: 'Dec 5', amount: 800, status: 'error' }
-  ]);
+  // Get userId from localStorage (set after login/signup)
+  const userId = localStorage.getItem('userId');
+  console.log('Dashboard userId:', userId); // Debug message
+
+  // Fetch invoices for this user on mount
+  useEffect(() => {
+    if (!userId) {
+      console.log('No userId found, user not logged in');
+      return;
+    }
+    console.log('Fetching invoices for userId:', userId);
+    fetch(`http://localhost:5000/api/invoices/${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        console.log('Received invoices:', data);
+        if (Array.isArray(data)) setInvoices(data);
+      })
+      .catch(error => {
+        console.error('Error fetching invoices:', error);
+      });
+  }, [userId]);
+
+  // Poll for invoice status updates when there's a processing invoice
+  useEffect(() => {
+    if (!userId || !currentInvoiceId || currentStatus === 'ready' || currentStatus === 'error') {
+      return;
+    }
+
+    const pollInterval = setInterval(() => {
+      console.log('Polling for invoice status update:', currentInvoiceId);
+      fetch(`http://localhost:5000/api/invoices/${userId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setInvoices(data);
+            const targetInvoice = data.find(inv => inv._id === currentInvoiceId);
+            if (targetInvoice) {
+              console.log('Target invoice status:', targetInvoice.status);
+              if (targetInvoice.status === 'ready') {
+                setCurrentStatus('ready');
+                setTimeout(() => {
+                  setCurrentStatus('idle');
+                  setCurrentInvoiceId(null);
+                }, 3000); // Show success for 3 seconds
+              } else if (targetInvoice.status === 'error') {
+                setCurrentStatus('error');
+                setTimeout(() => {
+                  setCurrentStatus('idle');
+                  setCurrentInvoiceId(null);
+                }, 5000); // Show error for 5 seconds
+              }
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Error polling invoice status:', error);
+        });
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [userId, currentInvoiceId, currentStatus]);
 
   const addLineItem = () => {
     const newItem: LineItem = {
@@ -110,9 +159,95 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
   };
 
   const filteredInvoices = invoices.filter(invoice =>
-    invoice.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    invoice.id.toLowerCase().includes(searchTerm.toLowerCase())
+    (invoice.clientName && invoice.clientName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (invoice._id && invoice._id.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const handleDownloadPDF = async (invoice: Invoice) => {
+    if (!invoice.pdfUrl || invoice.status !== 'ready') {
+      alert('PDF is not ready for download yet.');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`http://localhost:5000${invoice.pdfUrl}`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `invoice_${invoice._id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        alert('Failed to download PDF.');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Error downloading PDF.');
+    }
+  };
+
+  // When creating a new invoice, POST to backend with userId
+  const handleCreateInvoice = async () => {
+    if (!clientInfo.name || !clientInfo.email || lineItems.length === 0) {
+      alert('Please fill in all required fields and add at least one line item.');
+      return;
+    }
+    
+    if (!userId) {
+      alert('User not logged in. Please refresh the page and log in again.');
+      return;
+    }
+    
+    // Set status to creating
+    setCurrentStatus('creating');
+    
+    // Sanitize line items to match backend schema (remove id, ensure numbers)
+    const sanitizedItems = lineItems.map(({ description, quantity, unitPrice, total }) => ({
+      description,
+      quantity: Number(quantity),
+      unitPrice: Number(unitPrice),
+      total: Number(total)
+    }));
+    
+    try {
+      const res = await fetch('http://localhost:5000/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          clientName: clientInfo.name,
+          clientEmail: clientInfo.email,
+          items: sanitizedItems
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setInvoices(prev => [data, ...prev]);
+        setClientInfo({ name: '', email: '' });
+        setLineItems([]);
+        setCurrentStatus('processing');
+        setCurrentInvoiceId(data._id);
+        console.log('Invoice created, starting to monitor:', data._id);
+      } else {
+        console.error('Failed to create invoice:', data);
+        setCurrentStatus('error');
+        setTimeout(() => {
+          setCurrentStatus('idle');
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Network error:', error);
+      setCurrentStatus('error');
+      setTimeout(() => {
+        setCurrentStatus('idle');
+      }, 5000);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 flex">
@@ -302,8 +437,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
               </div>
 
               {/* Generate Button */}
-              <button className="w-full py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-purple-500/25">
-                Generate PDF Invoice
+              <button 
+                onClick={handleCreateInvoice} 
+                disabled={currentStatus === 'creating' || currentStatus === 'processing'}
+                className={`w-full py-3 rounded-lg font-medium transition-all duration-200 transform shadow-lg ${
+                  currentStatus === 'creating' || currentStatus === 'processing'
+                    ? 'bg-gray-600 cursor-not-allowed text-gray-300'
+                    : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white hover:scale-105 hover:shadow-purple-500/25'
+                }`}
+              >
+                {currentStatus === 'creating' ? 'Creating Invoice...' : 
+                 currentStatus === 'processing' ? 'Generating PDF...' : 
+                 'Generate PDF Invoice'}
               </button>
             </div>
 
@@ -330,42 +475,66 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
 
               {/* Invoice List */}
               <div className="space-y-3">
-                {filteredInvoices.map((invoice) => (
-                  <div key={invoice.id} className="bg-gray-700/50 rounded-lg p-4 hover:bg-gray-700 transition-all duration-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div>
-                          <div className="font-medium text-white">{invoice.id}</div>
-                          <div className="text-sm text-gray-400">{invoice.client}</div>
-                        </div>
-                        <div className="text-sm text-gray-400">{invoice.date}</div>
-                        <div className="font-medium text-white">${invoice.amount.toLocaleString()}</div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-3">
-                        <div className={`flex items-center space-x-1 px-2 py-1 rounded-full border text-xs font-medium ${getStatusColor(invoice.status)}`}>
-                          {getStatusIcon(invoice.status)}
-                          <span className="capitalize">{invoice.status}</span>
+                {filteredInvoices.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <FileText className="h-12 w-12 mx-auto mb-3 text-gray-600" />
+                    <p>No invoices yet. Create your first invoice above!</p>
+                  </div>
+                ) : (
+                  filteredInvoices.map((invoice) => (
+                    <div 
+                      key={invoice._id} 
+                      className={`bg-gray-700/50 rounded-lg p-4 hover:bg-gray-700 transition-all duration-200 ${
+                        invoice._id === currentInvoiceId ? 'ring-2 ring-purple-500/50' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div>
+                            <div className="font-medium text-white">{invoice._id}</div>
+                            <div className="text-sm text-gray-400">{invoice.clientName}</div>
+                          </div>
+                          <div className="text-sm text-gray-400">
+                            {invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString() : 'N/A'}
+                          </div>
+                          <div className="font-medium text-white">
+                            ${invoice.items.reduce((sum, item) => sum + item.total, 0).toLocaleString()}
+                          </div>
                         </div>
                         
-                        <div className="flex items-center space-x-1">
-                          <button className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200">
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200">
-                            <Download className="h-4 w-4" />
-                          </button>
-                          <button className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200">
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-all duration-200">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                        <div className="flex items-center space-x-3">
+                          <div className={`flex items-center space-x-1 px-2 py-1 rounded-full border text-xs font-medium ${getStatusColor(invoice.status)}`}>
+                            {getStatusIcon(invoice.status)}
+                            <span className="capitalize">{invoice.status}</span>
+                          </div>
+                          
+                          <div className="flex items-center space-x-1">
+                            <button className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200">
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleDownloadPDF(invoice)}
+                              disabled={invoice.status !== 'ready'}
+                              className={`p-1 rounded transition-all duration-200 ${
+                                invoice.status === 'ready' 
+                                  ? 'text-gray-400 hover:text-white hover:bg-gray-600' 
+                                  : 'text-gray-600 cursor-not-allowed'
+                              }`}
+                            >
+                              <Download className="h-4 w-4" />
+                            </button>
+                            <button className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200">
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-all duration-200">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
 
               {/* Real-time Updates */}
@@ -378,29 +547,46 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
             </div>
           </div>
 
-          {/* Status Messages */}
-          <div className="mt-8 grid md:grid-cols-3 gap-4">
-            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-              <div className="flex items-center space-x-2 text-green-400">
-                <CheckCircle className="h-5 w-5" />
-                <span className="font-medium">Invoice created successfully!</span>
-              </div>
+          {/* Status Messages - Only show during active operations */}
+          {currentStatus !== 'idle' && (
+            <div className="mt-8">
+              {currentStatus === 'creating' && (
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 text-blue-400">
+                    <Clock className="h-5 w-5 animate-spin" />
+                    <span className="font-medium">Creating invoice...</span>
+                  </div>
+                </div>
+              )}
+              
+              {currentStatus === 'processing' && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 text-yellow-400">
+                    <Clock className="h-5 w-5 animate-spin" />
+                    <span className="font-medium">Generating PDF...</span>
+                  </div>
+                </div>
+              )}
+              
+              {currentStatus === 'ready' && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 text-green-400">
+                    <CheckCircle className="h-5 w-5" />
+                    <span className="font-medium">Invoice created successfully! PDF is ready for download.</span>
+                  </div>
+                </div>
+              )}
+              
+              {currentStatus === 'error' && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 text-red-400">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="font-medium">Failed to create invoice. Please try again.</span>
+                  </div>
+                </div>
+              )}
             </div>
-            
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-              <div className="flex items-center space-x-2 text-yellow-400">
-                <Clock className="h-5 w-5" />
-                <span className="font-medium">Creating PDF...</span>
-              </div>
-            </div>
-            
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-              <div className="flex items-center space-x-2 text-red-400">
-                <AlertCircle className="h-5 w-5" />
-                <span className="font-medium">Failed to create invoice</span>
-              </div>
-            </div>
-          </div>
+          )}
         </main>
       </div>
     </div>

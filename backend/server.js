@@ -9,6 +9,7 @@ const invoiceRoutes = require('./routes/invoiceRoutes');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/pdfs', express.static('pdfs'));
 
 app.use('/api', authRoutes);
 app.use('/api/invoices', invoiceRoutes);

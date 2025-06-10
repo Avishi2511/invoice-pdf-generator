@@ -3,7 +3,13 @@ const mongoose = require('mongoose');
 const invoiceSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   clientName: { type: String, required: true },
-  items: [{ description: String, price: Number }],
+  clientEmail: { type: String },
+  items: [{
+    description: String,
+    quantity: Number,
+    unitPrice: Number,
+    total: Number
+  }],
   status: { type: String, default: 'processing' },
   pdfUrl: String,
 }, { timestamps: true });

@@ -59,6 +59,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         });
         const data = await res.json();
         if (res.ok) {
+          localStorage.setItem('userId', data.user.id);
           setApiError('');
           onLogin();
         } else {
