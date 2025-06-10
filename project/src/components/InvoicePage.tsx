@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
   Search, 
@@ -23,12 +23,19 @@ import {
 } from 'lucide-react';
 
 interface Invoice {
-  id: string;
-  client: string;
-  dateCreated: string;
-  amount: number;
+  _id: string;
+  clientName: string;
+  clientEmail?: string;
+  items: Array<{
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }>;
   status: 'ready' | 'processing' | 'error';
-  lastUpdated: string;
+  createdAt: string;
+  updatedAt: string;
+  pdfUrl?: string;
 }
 
 interface InvoicePageProps {
@@ -47,20 +54,68 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [invoices] = useState<Invoice[]>([
-    { id: 'INV-2024-001', client: 'ABC Corporation', dateCreated: 'Dec 15, 2024', amount: 2450.00, status: 'ready', lastUpdated: '2 mins ago' },
-    { id: 'INV-2024-002', client: 'XYZ Technologies', dateCreated: 'Dec 15, 2024', amount: 1890.00, status: 'processing', lastUpdated: '5 mins ago' },
-    { id: 'INV-2024-003', client: 'Tech Solutions Ltd', dateCreated: 'Dec 14, 2024', amount: 950.00, status: 'error', lastUpdated: '1 hour ago' },
-    { id: 'INV-2024-004', client: 'Global Enterprises', dateCreated: 'Dec 13, 2024', amount: 3200.00, status: 'ready', lastUpdated: '2 days ago' },
-    { id: 'INV-2024-005', client: 'StartUp Inc.', dateCreated: 'Dec 12, 2024', amount: 750.00, status: 'ready', lastUpdated: '3 days ago' },
-  ]);
+  // Get userId from localStorage
+  const userId = localStorage.getItem('userId');
 
+  // Fetch invoices from backend
+  const fetchInvoices = async () => {
+    if (!userId) {
+      setError('User not logged in');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`http://localhost:5000/api/invoices/${userId}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setInvoices(data);
+        setError(null);
+      } else {
+        setError('Failed to fetch invoices');
+      }
+    } catch (err) {
+      setError('Network error while fetching invoices');
+      console.error('Error fetching invoices:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch invoices on component mount
+  useEffect(() => {
+    fetchInvoices();
+  }, [userId]);
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      fetchInvoices();
+    }, 5000); // Refresh every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, userId]);
+
+  // Calculate stats from real data
   const stats = {
-    totalInvoices: 47,
-    thisMonth: 12,
-    totalRevenue: 15420,
-    processing: 3
+    totalInvoices: invoices.length,
+    thisMonth: invoices.filter(invoice => {
+      const invoiceDate = new Date(invoice.createdAt);
+      const now = new Date();
+      return invoiceDate.getMonth() === now.getMonth() && invoiceDate.getFullYear() === now.getFullYear();
+    }).length,
+    totalRevenue: invoices
+      .filter(invoice => invoice.status === 'ready')
+      .reduce((sum, invoice) => sum + invoice.items.reduce((itemSum, item) => itemSum + item.total, 0), 0),
+    processing: invoices.filter(invoice => invoice.status === 'processing').length
   };
 
   const getStatusIcon = (status: string) => {
@@ -82,15 +137,55 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
   };
 
   const filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = invoice.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         invoice.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = invoice.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         invoice._id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    
+    // Date filtering
+    let matchesDate = true;
+    if (dateRange !== 'all') {
+      const invoiceDate = new Date(invoice.createdAt);
+      const now = new Date();
+      
+      switch (dateRange) {
+        case 'today':
+          matchesDate = invoiceDate.toDateString() === now.toDateString();
+          break;
+        case 'week':
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          matchesDate = invoiceDate >= weekAgo;
+          break;
+        case 'month':
+          matchesDate = invoiceDate.getMonth() === now.getMonth() && 
+                       invoiceDate.getFullYear() === now.getFullYear();
+          break;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
-  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
+  // Sort invoices
+  const sortedInvoices = [...filteredInvoices].sort((a, b) => {
+    switch (sortBy) {
+      case 'date':
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      case 'amount':
+        const aAmount = a.items.reduce((sum, item) => sum + item.total, 0);
+        const bAmount = b.items.reduce((sum, item) => sum + item.total, 0);
+        return bAmount - aAmount;
+      case 'client':
+        return a.clientName.localeCompare(b.clientName);
+      case 'status':
+        return a.status.localeCompare(b.status);
+      default:
+        return 0;
+    }
+  });
+
+  const totalPages = Math.ceil(sortedInvoices.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedInvoices = sortedInvoices.slice(startIndex, startIndex + itemsPerPage);
 
   const toggleInvoiceSelection = (invoiceId: string) => {
     setSelectedInvoices(prev => 
@@ -104,8 +199,37 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
     setSelectedInvoices(prev => 
       prev.length === paginatedInvoices.length 
         ? []
-        : paginatedInvoices.map(invoice => invoice.id)
+        : paginatedInvoices.map(invoice => invoice._id)
     );
+  };
+
+  // Handle PDF download
+  const handleDownloadPDF = async (invoice: Invoice) => {
+    if (!invoice.pdfUrl || invoice.status !== 'ready') {
+      alert('PDF is not ready for download yet.');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`http://localhost:5000${invoice.pdfUrl}`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `invoice_${invoice._id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        alert('Failed to download PDF.');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Error downloading PDF.');
+    }
   };
 
   return (
@@ -298,11 +422,22 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
               </div>
 
               <div className="flex items-center gap-3">
+                <button 
+                  onClick={fetchInvoices}
+                  disabled={loading}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-200 flex items-center space-x-2 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
                 <button className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-200 flex items-center space-x-2">
                   <span>Bulk Actions</span>
                   <ChevronDown className="h-4 w-4" />
                 </button>
-                <button className="px-6 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-purple-500/25 flex items-center space-x-2">
+                <button 
+                  onClick={onNavigateToDashboard}
+                  className="px-6 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-purple-500/25 flex items-center space-x-2"
+                >
                   <Plus className="h-4 w-4" />
                   <span>New Invoice</span>
                 </button>
@@ -324,7 +459,7 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
                         className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-600 rounded bg-gray-700"
                       />
                     </th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Invoice #</th>
+                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Invoice ID</th>
                     <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Client</th>
                     <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Date Created</th>
                     <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Amount</th>
@@ -334,47 +469,86 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
-                  {paginatedInvoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-700/30 transition-all duration-200">
-                      <td className="px-6 py-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedInvoices.includes(invoice.id)}
-                          onChange={() => toggleInvoiceSelection(invoice.id)}
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-600 rounded bg-gray-700"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium text-white">{invoice.id}</td>
-                      <td className="px-6 py-4 text-sm text-gray-300">{invoice.client}</td>
-                      <td className="px-6 py-4 text-sm text-gray-300">{invoice.dateCreated}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-white">${invoice.amount.toLocaleString()}</td>
-                      <td className="px-6 py-4">
-                        <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full border text-xs font-medium ${getStatusColor(invoice.status)}`}>
-                          {getStatusIcon(invoice.status)}
-                          <span className="capitalize">{invoice.status}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-400">{invoice.lastUpdated}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center space-x-2">
-                          <button className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded transition-all duration-200">
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button className="p-1 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded transition-all duration-200">
-                            <Download className="h-4 w-4" />
-                          </button>
-                          {invoice.status === 'error' && (
-                            <button className="p-1 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded transition-all duration-200">
-                              <RefreshCw className="h-4 w-4" />
-                            </button>
-                          )}
-                          <button className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </button>
-                        </div>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-8 text-center text-gray-400">
+                        <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
+                        Loading invoices...
                       </td>
                     </tr>
-                  ))}
+                  ) : error ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-8 text-center text-red-400">
+                        <AlertCircle className="h-6 w-6 mx-auto mb-2" />
+                        {error}
+                      </td>
+                    </tr>
+                  ) : paginatedInvoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-8 text-center text-gray-400">
+                        <FileText className="h-6 w-6 mx-auto mb-2" />
+                        No invoices found
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedInvoices.map((invoice) => (
+                      <tr key={invoice._id} className="hover:bg-gray-700/30 transition-all duration-200">
+                        <td className="px-6 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedInvoices.includes(invoice._id)}
+                            onChange={() => toggleInvoiceSelection(invoice._id)}
+                            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-600 rounded bg-gray-700"
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-white">
+                          {invoice._id.slice(-8).toUpperCase()}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-300">{invoice.clientName}</td>
+                        <td className="px-6 py-4 text-sm text-gray-300">
+                          {new Date(invoice.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-white">
+                          ${invoice.items.reduce((sum, item) => sum + item.total, 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full border text-xs font-medium ${getStatusColor(invoice.status)}`}>
+                            {getStatusIcon(invoice.status)}
+                            <span className="capitalize">{invoice.status}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-400">
+                          {new Date(invoice.updatedAt).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center space-x-2">
+                            <button className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded transition-all duration-200">
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleDownloadPDF(invoice)}
+                              disabled={invoice.status !== 'ready'}
+                              className={`p-1 rounded transition-all duration-200 ${
+                                invoice.status === 'ready'
+                                  ? 'text-green-400 hover:text-green-300 hover:bg-green-500/10'
+                                  : 'text-gray-600 cursor-not-allowed'
+                              }`}
+                            >
+                              <Download className="h-4 w-4" />
+                            </button>
+                            {invoice.status === 'error' && (
+                              <button className="p-1 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 rounded transition-all duration-200">
+                                <RefreshCw className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -384,7 +558,7 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <span className="text-sm text-gray-400">
-                    Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredInvoices.length)} of {filteredInvoices.length} invoices
+                    Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, sortedInvoices.length)} of {sortedInvoices.length} invoices
                   </span>
                   <select
                     value={itemsPerPage}
