@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
   Search, 
-  Filter, 
   Download, 
   Eye, 
   Trash2, 
-  Edit, 
   User, 
   Settings, 
   LogOut,
@@ -45,7 +43,12 @@ interface InvoicePageProps {
   onNavigateToHome: () => void;
 }
 
-const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboard, onNavigateToSettings, onNavigateToHome }) => {
+const InvoicePage: React.FC<InvoicePageProps> = ({
+  onLogout,
+  onNavigateToDashboard,
+  onNavigateToSettings,
+  onNavigateToHome
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateRange, setDateRange] = useState('all');
@@ -57,6 +60,7 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string>('');
 
   // Get userId from localStorage
   const userId = localStorage.getItem('userId');
@@ -92,6 +96,14 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
   useEffect(() => {
     fetchInvoices();
   }, [userId]);
+
+  // Fetch user email on component mount
+  useEffect(() => {
+    const email = localStorage.getItem('userEmail');
+    if (email) {
+      setUserEmail(email);
+    }
+  }, []);
 
   // Auto-refresh functionality
   useEffect(() => {
@@ -232,18 +244,115 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
     }
   };
 
+  const handleDeleteInvoice = async (invoice: Invoice) => {
+    if (!confirm(`Are you sure you want to delete invoice for ${invoice.clientName}? This action cannot be undone.`)) {
+      return;
+    }
+
+    if (!userId) {
+      alert('User not logged in. Please refresh the page and log in again.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/invoices/${invoice._id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+
+      if (response.ok) {
+        // Remove invoice from local state
+        setInvoices(prev => prev.filter(inv => inv._id !== invoice._id));
+        
+        // Remove from selected invoices if it was selected
+        setSelectedInvoices(prev => prev.filter(id => id !== invoice._id));
+        
+        console.log('Invoice deleted successfully:', invoice._id);
+      } else {
+        const data = await response.json();
+        alert(`Failed to delete invoice: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Error deleting invoice. Please try again.');
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedInvoices.length === 0) {
+      alert('Please select invoices to delete.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete ${selectedInvoices.length} selected invoice(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    if (!userId) {
+      alert('User not logged in. Please refresh the page and log in again.');
+      return;
+    }
+
+    try {
+      // Delete all selected invoices in parallel
+      const deletePromises = selectedInvoices.map(invoiceId =>
+        fetch(`http://localhost:5000/api/invoices/${invoiceId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        })
+      );
+
+      const responses = await Promise.all(deletePromises);
+      
+      // Check which deletions succeeded
+      const succeededDeletions: string[] = [];
+      const failedDeletions: string[] = [];
+
+      for (let i = 0; i < responses.length; i++) {
+        if (responses[i].ok) {
+          succeededDeletions.push(selectedInvoices[i]);
+        } else {
+          failedDeletions.push(selectedInvoices[i]);
+        }
+      }
+
+      // Update local state to remove succeeded deletions
+      if (succeededDeletions.length > 0) {
+        setInvoices(prev => prev.filter(inv => !succeededDeletions.includes(inv._id)));
+        setSelectedInvoices(prev => prev.filter(id => !succeededDeletions.includes(id)));
+      }
+
+      // Show results
+      if (failedDeletions.length === 0) {
+        alert(`Successfully deleted ${succeededDeletions.length} invoice(s).`);
+      } else {
+        alert(`Deleted ${succeededDeletions.length} invoice(s). Failed to delete ${failedDeletions.length} invoice(s).`);
+      }
+
+      console.log('Bulk deletion completed:', { succeeded: succeededDeletions, failed: failedDeletions });
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      alert('Error deleting invoices. Please try again.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 flex">
       {/* Sidebar */}
       <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
         {/* Logo */}
         <div className="p-6 border-b border-gray-700">
-          <div className="flex items-center space-x-2">
+          <button 
+            onClick={onNavigateToHome}
+            className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200"
+          >
             <div className="p-2 bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg">
               <FileText className="h-6 w-6 text-white" />
             </div>
             <span className="text-xl font-bold text-white">InvoicePro</span>
-          </div>
+          </button>
         </div>
 
         {/* Navigation */}
@@ -283,7 +392,7 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 px-3 py-2 bg-gray-700 rounded-lg">
                 <User className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-300">John Doe</span>
+                <span className="text-gray-300">{userEmail || 'Loading...'}</span>
                 <ChevronDown className="h-4 w-4 text-gray-400" />
               </div>
               <button 
@@ -299,22 +408,6 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
 
         {/* Invoice Management Content */}
         <main className="flex-1 p-6 overflow-auto">
-          {/* Navigation Buttons */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-            <button onClick={onNavigateToHome} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-200">
-              Home
-            </button>
-            <button onClick={onNavigateToDashboard} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-200">
-              Dashboard
-            </button>
-            <button onClick={onNavigateToSettings} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-200">
-              Settings
-            </button>
-            <button onClick={onLogout} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all duration-200">
-              Logout
-            </button>
-          </div>
-
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
@@ -541,6 +634,13 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
                                 <RefreshCw className="h-4 w-4" />
                               </button>
                             )}
+                            <button 
+                              onClick={() => handleDeleteInvoice(invoice)}
+                              className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-all duration-200"
+                              title="Delete Invoice"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                             <button className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200">
                               <MoreHorizontal className="h-4 w-4" />
                             </button>
@@ -614,9 +714,17 @@ const InvoicePage: React.FC<InvoicePageProps> = ({ onLogout, onNavigateToDashboa
                 <Download className="h-4 w-4" />
                 <span>Export Selected</span>
               </button>
-              <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2">
+              <button 
+                onClick={handleDeleteSelected}
+                disabled={selectedInvoices.length === 0}
+                className={`px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 ${
+                  selectedInvoices.length === 0 
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                    : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
+              >
                 <Trash2 className="h-4 w-4" />
-                <span>Delete Selected</span>
+                <span>Delete Selected ({selectedInvoices.length})</span>
               </button>
               <button className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-200 flex items-center space-x-2">
                 <CheckCircle className="h-4 w-4" />

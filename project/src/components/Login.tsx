@@ -3,9 +3,10 @@ import { Eye, EyeOff, FileText, Mail, Lock } from 'lucide-react';
 
 interface LoginProps {
   onLogin: () => void;
+  onNavigateHome?: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, onNavigateHome }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -60,6 +61,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         const data = await res.json();
         if (res.ok) {
           localStorage.setItem('userId', data.user.id);
+          localStorage.setItem('userEmail', data.user.email);
           setApiError('');
           onLogin();
         } else {
@@ -82,12 +84,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="relative max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <div className="flex items-center justify-center space-x-2 mb-6">
+          <button 
+            onClick={onNavigateHome}
+            className="flex items-center justify-center space-x-2 mb-6 mx-auto hover:opacity-80 transition-opacity duration-200"
+          >
             <div className="p-2 bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg">
               <FileText className="h-8 w-8 text-white" />
             </div>
             <span className="text-2xl font-bold text-white">InvoicePro</span>
-          </div>
+          </button>
           <h2 className="text-3xl font-bold text-white mb-2">Welcome Back</h2>
           <p className="text-gray-400">Sign in to your account</p>
         </div>

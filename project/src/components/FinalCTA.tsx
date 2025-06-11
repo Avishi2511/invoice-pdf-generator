@@ -28,10 +28,6 @@ const FinalCTA: React.FC = () => {
             <ArrowRight className="ml-3 h-6 w-6 group-hover:translate-x-1 transition-transform duration-200" />
           </button>
           
-          <button className="group px-10 py-5 border-2 border-purple-500 text-purple-300 hover:bg-purple-500/10 rounded-2xl font-bold text-xl transition-all duration-300 flex items-center">
-            <Play className="h-6 w-6 mr-3 group-hover:scale-110 transition-transform duration-200" />
-            View Live Demo
-          </button>
         </div>
 
         {/* Additional Trust Elements */}

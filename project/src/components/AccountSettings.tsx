@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
   User, 
@@ -24,57 +24,212 @@ import {
   Calendar,
   AlertTriangle,
   Save,
-  ChevronRight
+  ChevronRight,
+  Loader
 } from 'lucide-react';
 
 export interface AccountSettingsProps {
   onLogout: () => void;
   onNavigateToDashboard: () => void;
   onNavigateToInvoices: () => void;
-  onNavigateHome: () => void; // <-- Add this line
+  onNavigateHome: () => void;
 }
 
-const AccountSettings: React.FC<AccountSettingsProps> = ({ 
-  onLogout, 
-  onNavigateToDashboard, 
-  onNavigateToInvoices 
+interface UserProfile {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  company: string;
+  address: string;
+  taxRate: string;
+  currency: string;
+  invoiceFormat: string;
+  paymentReminders: boolean;
+  emailNotifications: boolean;
+  smsNotifications: boolean;
+  profilePicture?: string;
+}
+
+interface SecurityData {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+  twoFactorEnabled: boolean;
+  emailVerified: boolean;
+  lastLogin: string;
+}
+
+interface BillingData {
+  plan: string;
+  billingCycle: string;
+  nextBilling: string;
+  paymentMethod: string;
+  billingAddress: string;
+  billingHistory: Array<{
+    date: string;
+    amount: string;
+    status: string;
+    invoice: string;
+  }>;
+}
+
+const AccountSettings: React.FC<AccountSettingsProps> = ({
+  onLogout,
+  onNavigateToDashboard,
+  onNavigateToInvoices,
+  onNavigateHome
 }) => {
   const [activeTab, setActiveTab] = useState('profile');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  const [profileData, setProfileData] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 (555) 123-4567',
-    company: 'Tech Solutions Inc.',
-    address: '123 Main Street, NY 10001',
-    taxRate: '8.25',
+  const [profileData, setProfileData] = useState<UserProfile>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    company: '',
+    address: '',
+    taxRate: '',
     currency: 'USD ($)',
     invoiceFormat: 'INV-YYYY-###',
-    paymentReminders: true,
-    emailNotifications: true,
+    paymentReminders: false,
+    emailNotifications: false,
     smsNotifications: false
   });
 
-  const [securityData, setSecurityData] = useState({
+  const [securityData, setSecurityData] = useState<SecurityData>({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
     twoFactorEnabled: false,
-    emailVerified: true,
-    lastLogin: 'Jan 15, 2025 at 2:30 PM'
+    emailVerified: false,
+    lastLogin: ''
   });
 
-  const [billingData, setBillingData] = useState({
-    plan: 'Professional',
-    billingCycle: 'monthly',
-    nextBilling: 'Feb 15, 2025',
-    paymentMethod: '**** **** **** 4567',
-    billingAddress: '123 Main Street, NY 10001'
+  const [billingData, setBillingData] = useState<BillingData>({
+    plan: '',
+    billingCycle: '',
+    nextBilling: '',
+    paymentMethod: '',
+    billingAddress: '',
+    billingHistory: []
   });
+
+  // Get userId from localStorage
+  const userId = localStorage.getItem('userId');
+
+  // Fetch user profile data
+  const fetchUserProfile = async () => {
+    if (!userId) return;
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/profile/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setProfileData({
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          company: data.company || '',
+          address: data.address || '',
+          taxRate: data.taxRate || '0',
+          currency: data.currency || 'USD ($)',
+          invoiceFormat: data.invoiceFormat || 'INV-YYYY-###',
+          paymentReminders: data.paymentReminders || false,
+          emailNotifications: data.emailNotifications || false,
+          smsNotifications: data.smsNotifications || false,
+          profilePicture: data.profilePicture
+        });
+      } else {
+        setError('Failed to fetch profile data');
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      setError('Error loading profile data');
+    }
+  };
+
+  // Fetch security data
+  const fetchSecurityData = async () => {
+    if (!userId) return;
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/security/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSecurityData(prev => ({
+          ...prev,
+          twoFactorEnabled: data.twoFactorEnabled || false,
+          emailVerified: data.emailVerified || false,
+          lastLogin: data.lastLogin || 'Never'
+        }));
+      } else {
+        setError('Failed to fetch security data');
+      }
+    } catch (error) {
+      console.error('Error fetching security data:', error);
+      setError('Error loading security data');
+    }
+  };
+
+  // Fetch billing data
+  const fetchBillingData = async () => {
+    if (!userId) return;
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/billing/${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setBillingData({
+          plan: data.plan || 'Free',
+          billingCycle: data.billingCycle || 'monthly',
+          nextBilling: data.nextBilling || 'N/A',
+          paymentMethod: data.paymentMethod || 'No payment method',
+          billingAddress: data.billingAddress || 'No billing address',
+          billingHistory: data.billingHistory || []
+        });
+      } else {
+        setError('Failed to fetch billing data');
+      }
+    } catch (error) {
+      console.error('Error fetching billing data:', error);
+      setError('Error loading billing data');
+    }
+  };
+
+  // Fetch all data on component mount
+  useEffect(() => {
+    const fetchAllData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        await Promise.all([
+          fetchUserProfile(),
+          fetchSecurityData(),
+          fetchBillingData()
+        ]);
+      } catch (error) {
+        setError('Failed to load user data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (userId) {
+      fetchAllData();
+    } else {
+      setError('User not logged in');
+      setLoading(false);
+    }
+  }, [userId]);
 
   const handleProfileUpdate = (field: string, value: string | boolean) => {
     setProfileData(prev => ({ ...prev, [field]: value }));
@@ -84,10 +239,123 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
     setSecurityData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveChanges = () => {
-    // Handle save logic here
-    console.log('Saving changes...');
+  // Save profile changes
+  const handleSaveProfile = async () => {
+    if (!userId) return;
+    
+    setSaving(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/profile/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profileData)
+      });
+
+      if (response.ok) {
+        alert('Profile updated successfully!');
+      } else {
+        alert('Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Error updating profile');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  // Update password
+  const handleUpdatePassword = async () => {
+    if (!userId) return;
+    
+    if (securityData.newPassword !== securityData.confirmPassword) {
+      alert('New passwords do not match');
+      return;
+    }
+
+    if (securityData.newPassword.length < 6) {
+      alert('New password must be at least 6 characters long');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/password/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword: securityData.currentPassword,
+          newPassword: securityData.newPassword
+        })
+      });
+
+      if (response.ok) {
+        alert('Password updated successfully!');
+        setSecurityData(prev => ({
+          ...prev,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        }));
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || 'Failed to update password');
+      }
+    } catch (error) {
+      console.error('Error updating password:', error);
+      alert('Error updating password');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveChanges = () => {
+    if (activeTab === 'profile') {
+      handleSaveProfile();
+    } else if (activeTab === 'security') {
+      handleUpdatePassword();
+    }
+  };
+
+  // Get user initials for profile picture
+  const getUserInitials = () => {
+    const first = profileData.firstName?.charAt(0)?.toUpperCase() || '';
+    const last = profileData.lastName?.charAt(0)?.toUpperCase() || '';
+    return first + last || 'U';
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="flex items-center space-x-3 text-white">
+          <Loader className="h-6 w-6 animate-spin" />
+          <span>Loading account settings...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && !userId) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-400 mb-4">{error}</div>
+          <button 
+            onClick={onNavigateHome}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-200"
+          >
+            Go to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const renderProfileTab = () => (
     <div className="space-y-8">
@@ -96,9 +364,17 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
         <h3 className="text-lg font-semibold text-white mb-6">Profile Picture</h3>
         <div className="flex items-center space-x-6">
           <div className="relative">
-            <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-purple-700 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              JD
-            </div>
+            {profileData.profilePicture ? (
+              <img 
+                src={profileData.profilePicture} 
+                alt="Profile" 
+                className="w-20 h-20 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-purple-700 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                {getUserInitials()}
+              </div>
+            )}
             <button className="absolute -bottom-1 -right-1 p-2 bg-purple-600 hover:bg-purple-700 rounded-full text-white transition-all duration-200">
               <Camera className="h-4 w-4" />
             </button>
@@ -133,6 +409,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                 value={profileData.firstName}
                 onChange={(e) => handleProfileUpdate('firstName', e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Enter first name"
               />
             </div>
           </div>
@@ -148,6 +425,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                 value={profileData.lastName}
                 onChange={(e) => handleProfileUpdate('lastName', e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Enter last name"
               />
             </div>
           </div>
@@ -163,6 +441,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                 value={profileData.email}
                 onChange={(e) => handleProfileUpdate('email', e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Enter email address"
               />
             </div>
           </div>
@@ -178,6 +457,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                 value={profileData.phone}
                 onChange={(e) => handleProfileUpdate('phone', e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Enter phone number"
               />
             </div>
           </div>
@@ -193,6 +473,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                 value={profileData.company}
                 onChange={(e) => handleProfileUpdate('company', e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Enter company name"
               />
             </div>
           </div>
@@ -208,6 +489,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                 value={profileData.address}
                 onChange={(e) => handleProfileUpdate('address', e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Enter address"
               />
             </div>
           </div>
@@ -229,6 +511,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                 value={profileData.taxRate}
                 onChange={(e) => handleProfileUpdate('taxRate', e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="0.00"
               />
             </div>
           </div>
@@ -263,6 +546,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                 value={profileData.invoiceFormat}
                 onChange={(e) => handleProfileUpdate('invoiceFormat', e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="INV-YYYY-###"
               />
             </div>
           </div>
@@ -300,31 +584,47 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
         <div className="space-y-4">
           <div className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-green-500/20 rounded-lg">
-                <Check className="h-5 w-5 text-green-400" />
+              <div className={`p-2 ${securityData.emailVerified ? 'bg-green-500/20' : 'bg-red-500/20'} rounded-lg`}>
+                {securityData.emailVerified ? (
+                  <Check className="h-5 w-5 text-green-400" />
+                ) : (
+                  <X className="h-5 w-5 text-red-400" />
+                )}
               </div>
               <div>
                 <p className="text-white font-medium">Email Verification</p>
-                <p className="text-sm text-green-400">Verified</p>
+                <p className={`text-sm ${securityData.emailVerified ? 'text-green-400' : 'text-red-400'}`}>
+                  {securityData.emailVerified ? 'Verified' : 'Not Verified'}
+                </p>
               </div>
             </div>
-            <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm border border-green-500/30">
-              Verified
+            <span className={`px-3 py-1 rounded-full text-sm border ${
+              securityData.emailVerified 
+                ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                : 'bg-red-500/20 text-red-400 border-red-500/30'
+            }`}>
+              {securityData.emailVerified ? 'Verified' : 'Unverified'}
             </span>
           </div>
 
           <div className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-red-500/20 rounded-lg">
-                <X className="h-5 w-5 text-red-400" />
+              <div className={`p-2 ${securityData.twoFactorEnabled ? 'bg-green-500/20' : 'bg-red-500/20'} rounded-lg`}>
+                {securityData.twoFactorEnabled ? (
+                  <Check className="h-5 w-5 text-green-400" />
+                ) : (
+                  <X className="h-5 w-5 text-red-400" />
+                )}
               </div>
               <div>
                 <p className="text-white font-medium">Two-Factor Authentication</p>
-                <p className="text-sm text-red-400">Disabled</p>
+                <p className={`text-sm ${securityData.twoFactorEnabled ? 'text-green-400' : 'text-red-400'}`}>
+                  {securityData.twoFactorEnabled ? 'Enabled' : 'Disabled'}
+                </p>
               </div>
             </div>
             <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-200">
-              Enable
+              {securityData.twoFactorEnabled ? 'Disable' : 'Enable'}
             </button>
           </div>
 
@@ -415,8 +715,13 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
             </div>
           </div>
 
-          <button className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-200 font-medium">
-            Update Password
+          <button 
+            onClick={handleUpdatePassword}
+            disabled={saving}
+            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg transition-all duration-200 font-medium flex items-center space-x-2"
+          >
+            {saving && <Loader className="h-4 w-4 animate-spin" />}
+            <span>Update Password</span>
           </button>
         </div>
       </div>
@@ -476,12 +781,15 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <h4 className="text-xl font-bold text-white">{billingData.plan}</h4>
-              <p className="text-purple-300">$29/month • Billed monthly</p>
+              <p className="text-purple-300">
+                {billingData.plan === 'Free' ? 'Free Plan' : `$29/${billingData.billingCycle}`} • 
+                {billingData.billingCycle === 'monthly' ? ' Billed monthly' : ' Billed annually'}
+              </p>
               <p className="text-sm text-gray-400 mt-2">Next billing: {billingData.nextBilling}</p>
             </div>
             <div className="text-right">
               <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-200 mb-2">
-                Upgrade Plan
+                {billingData.plan === 'Free' ? 'Upgrade Plan' : 'Change Plan'}
               </button>
               <p className="text-xs text-gray-400">Change billing cycle</p>
             </div>
@@ -499,12 +807,14 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
                 <CreditCard className="h-5 w-5 text-blue-400" />
               </div>
               <div>
-                <p className="text-white font-medium">Credit Card</p>
+                <p className="text-white font-medium">
+                  {billingData.paymentMethod === 'No payment method' ? 'No Payment Method' : 'Credit Card'}
+                </p>
                 <p className="text-sm text-gray-400">{billingData.paymentMethod}</p>
               </div>
             </div>
             <button className="px-4 py-2 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white rounded-lg transition-all duration-200">
-              Update
+              {billingData.paymentMethod === 'No payment method' ? 'Add' : 'Update'}
             </button>
           </div>
         </div>
@@ -525,7 +835,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
               </div>
             </div>
             <button className="px-4 py-2 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white rounded-lg transition-all duration-200">
-              Edit
+              {billingData.billingAddress === 'No billing address' ? 'Add' : 'Edit'}
             </button>
           </div>
         </div>
@@ -534,29 +844,37 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
       {/* Billing History */}
       <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-white mb-6">Billing History</h3>
-        <div className="space-y-3">
-          {[
-            { date: 'Jan 15, 2025', amount: '$29.00', status: 'Paid', invoice: 'INV-2025-001' },
-            { date: 'Dec 15, 2024', amount: '$29.00', status: 'Paid', invoice: 'INV-2024-012' },
-            { date: 'Nov 15, 2024', amount: '$29.00', status: 'Paid', invoice: 'INV-2024-011' }
-          ].map((item, index) => (
-            <div key={index} className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg">
-              <div className="flex items-center space-x-4">
-                <div className="text-white font-medium">{item.date}</div>
-                <div className="text-gray-400">{item.invoice}</div>
+        {billingData.billingHistory.length > 0 ? (
+          <div className="space-y-3">
+            {billingData.billingHistory.map((item, index) => (
+              <div key={index} className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg">
+                <div className="flex items-center space-x-4">
+                  <div className="text-white font-medium">{item.date}</div>
+                  <div className="text-gray-400">{item.invoice}</div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <div className="text-white font-medium">{item.amount}</div>
+                  <span className={`px-2 py-1 rounded-full text-xs border ${
+                    item.status === 'Paid' 
+                      ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                      : item.status === 'Pending'
+                      ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                      : 'bg-red-500/20 text-red-400 border-red-500/30'
+                  }`}>
+                    {item.status}
+                  </span>
+                  <button className="text-purple-400 hover:text-purple-300 transition-colors duration-200">
+                    Download
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center space-x-4">
-                <div className="text-white font-medium">{item.amount}</div>
-                <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs border border-green-500/30">
-                  {item.status}
-                </span>
-                <button className="text-purple-400 hover:text-purple-300 transition-colors duration-200">
-                  Download
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-400">
+            <p>No billing history available</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -567,12 +885,15 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
       <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
         {/* Logo */}
         <div className="p-6 border-b border-gray-700">
-          <div className="flex items-center space-x-2">
+          <button 
+            onClick={onNavigateHome}
+            className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200"
+          >
             <div className="p-2 bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg">
               <FileText className="h-6 w-6 text-white" />
             </div>
             <span className="text-xl font-bold text-white">InvoicePro</span>
-          </div>
+          </button>
         </div>
 
         {/* Navigation */}
@@ -622,7 +943,12 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 px-3 py-2 bg-gray-700 rounded-lg">
                 <User className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-300">John Doe</span>
+                <span className="text-gray-300">
+                  {profileData.firstName && profileData.lastName 
+                    ? `${profileData.firstName} ${profileData.lastName}`
+                    : profileData.email || 'User'
+                  }
+                </span>
               </div>
               <button 
                 onClick={onLogout}
@@ -637,6 +963,12 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
 
         {/* Settings Content */}
         <main className="flex-1 p-6 overflow-auto">
+          {error && (
+            <div className="bg-red-500/20 border border-red-500/30 text-red-400 p-4 rounded-lg mb-6">
+              {error}
+            </div>
+          )}
+
           {/* Tab Navigation */}
           <div className="bg-gray-800 rounded-xl border border-gray-700 mb-6">
             <div className="flex border-b border-gray-700">
@@ -690,8 +1022,10 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
               </button>
               <button 
                 onClick={handleSaveChanges}
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-purple-500/25 flex items-center space-x-2"
+                disabled={saving}
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 disabled:opacity-50 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-purple-500/25 flex items-center space-x-2"
               >
+                {saving && <Loader className="h-4 w-4 animate-spin" />}
                 <Save className="h-4 w-4" />
                 <span>Save Changes</span>
               </button>

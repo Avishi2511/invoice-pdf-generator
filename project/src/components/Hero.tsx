@@ -31,10 +31,6 @@ const Hero: React.FC = () => {
               <span className="ml-2 group-hover:translate-x-1 transition-transform duration-200 inline-block">→</span>
             </button>
             
-            <button className="group px-8 py-4 border-2 border-purple-500 text-purple-300 hover:bg-purple-500/10 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center justify-center">
-              <Play className="h-5 w-5 mr-2" />
-              Watch Demo
-            </button>
           </div>
 
           {/* Trust Indicators */}

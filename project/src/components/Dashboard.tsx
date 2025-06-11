@@ -45,6 +45,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [currentStatus, setCurrentStatus] = useState<'idle' | 'creating' | 'processing' | 'ready' | 'error'>('idle');
   const [currentInvoiceId, setCurrentInvoiceId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string>('');
 
   // Get userId from localStorage (set after login/signup)
   const userId = localStorage.getItem('userId');
@@ -107,6 +108,26 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
 
     return () => clearInterval(pollInterval);
   }, [userId, currentInvoiceId, currentStatus]);
+
+  // Fetch user information
+  const fetchUserInfo = async () => {
+    if (!userId) return;
+    
+    try {
+      // Since we only have email in localStorage after login, let's get it from there
+      const email = localStorage.getItem('userEmail');
+      if (email) {
+        setUserEmail(email);
+      }
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+    }
+  };
+
+  // Fetch user info on mount
+  useEffect(() => {
+    fetchUserInfo();
+  }, [userId]);
 
   const addLineItem = () => {
     const newItem: LineItem = {
@@ -191,6 +212,44 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
     }
   };
 
+  const handleDeleteInvoice = async (invoice: Invoice) => {
+    if (!confirm(`Are you sure you want to delete invoice for ${invoice.clientName}? This action cannot be undone.`)) {
+      return;
+    }
+
+    if (!userId) {
+      alert('User not logged in. Please refresh the page and log in again.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/invoices/${invoice._id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+
+      if (response.ok) {
+        // Remove invoice from local state
+        setInvoices(prev => prev.filter(inv => inv._id !== invoice._id));
+        
+        // If this was the current invoice being processed, reset status
+        if (currentInvoiceId === invoice._id) {
+          setCurrentStatus('idle');
+          setCurrentInvoiceId(null);
+        }
+        
+        console.log('Invoice deleted successfully:', invoice._id);
+      } else {
+        const data = await response.json();
+        alert(`Failed to delete invoice: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Error deleting invoice. Please try again.');
+    }
+  };
+
   // When creating a new invoice, POST to backend with userId
   const handleCreateInvoice = async () => {
     if (!clientInfo.name || !clientInfo.email || lineItems.length === 0) {
@@ -255,12 +314,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
       <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
         {/* Logo */}
         <div className="p-6 border-b border-gray-700">
-          <div className="flex items-center space-x-2">
+          <button 
+            onClick={onNavigateToHome}
+            className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200"
+          >
             <div className="p-2 bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg">
               <FileText className="h-6 w-6 text-white" />
             </div>
             <span className="text-xl font-bold text-white">InvoicePro</span>
-          </div>
+          </button>
         </div>
 
         {/* Navigation */}
@@ -268,14 +330,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
           <div className="space-y-2">
             <button
               onClick={onNavigateToHome}
-              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-gray-300 hover:bg-gray-700 hover:text-white"
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 bg-purple-600 text-white shadow-lg"
             >
               <FileText className="h-5 w-5" />
-              <span>Home</span>
+              <span>Dashboard</span>
             </button>
             <button
               onClick={onNavigateToInvoices}
-              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 bg-purple-600 text-white shadow-lg"
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-gray-300 hover:bg-gray-700 hover:text-white"
             >
               <FileText className="h-5 w-5" />
               <span>Invoices</span>
@@ -311,7 +373,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 px-3 py-2 bg-gray-700 rounded-lg">
                 <User className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-300">John Doe</span>
+                <span className="text-gray-300">{userEmail || 'Loading...'}</span>
                 <ChevronDown className="h-4 w-4 text-gray-400" />
               </div>
               <button 
@@ -526,7 +588,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, onNavigateToInvoices, o
                             <button className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-all duration-200">
                               <Edit className="h-4 w-4" />
                             </button>
-                            <button className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-all duration-200">
+                            <button 
+                              onClick={() => handleDeleteInvoice(invoice)}
+                              className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-all duration-200"
+                            >
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>

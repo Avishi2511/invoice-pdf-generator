@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import Features from './components/Features';
@@ -11,94 +12,94 @@ import Dashboard from './components/Dashboard';
 import InvoicePage from './components/InvoicePage';
 import AccountSettings from './components/AccountSettings';
 
-function App() {
+// Home page component
+const HomePage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'login', 'signup', 'dashboard', 'invoices', 'settings'
+  const navigate = useNavigate();
 
-  // Simple routing for demo purposes
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'login':
-        return <Login onLogin={() => setCurrentPage('dashboard')} />;
-      case 'signup':
-        return <Signup onSignup={() => setCurrentPage('dashboard')} />;
-      case 'dashboard':
-        return (
-          <Dashboard 
-            onLogout={() => setCurrentPage('home')} 
-            onNavigateToInvoices={() => setCurrentPage('invoices')} 
-            onNavigateToSettings={() => setCurrentPage('settings')}
-            onNavigateToHome={() => setCurrentPage('home')}
-          />
-        );
-      case 'invoices':
-        return (
-          <InvoicePage 
-            onLogout={() => setCurrentPage('home')} 
-            onNavigateToDashboard={() => setCurrentPage('dashboard')} 
-            onNavigateToSettings={() => setCurrentPage('settings')}
-            onNavigateToHome={() => setCurrentPage('home')}
-          />
-        );
-      case 'settings':
-        return (
-          <AccountSettings 
-            onLogout={() => setCurrentPage('home')} 
-            onNavigateToDashboard={() => setCurrentPage('dashboard')}
-            onNavigateToInvoices={() => setCurrentPage('invoices')}
-            onNavigateHome={() => setCurrentPage('home')}
-          />
-        );
-      default:
-        return (
-          <div className="min-h-screen bg-gray-900">
-            <Header 
-              mobileMenuOpen={mobileMenuOpen} 
-              setMobileMenuOpen={setMobileMenuOpen}
-              onNavigateHome={() => setCurrentPage('home')}
-              onNavigateLogin={() => setCurrentPage('login')}
-              onNavigateSignup={() => setCurrentPage('signup')}
-              onNavigateDashboard={() => setCurrentPage('dashboard')}
-              onNavigateInvoices={() => setCurrentPage('invoices')}
-              onNavigateSettings={() => setCurrentPage('settings')}
-            />
-            <Hero />
-            <Features />
-            <HowItWorks />
-            <FinalCTA />
-            <Footer />
-          </div>
-        );
-    }
-  };
+  return (
+    <div className="min-h-screen bg-gray-900">
+      <Header 
+        mobileMenuOpen={mobileMenuOpen} 
+        setMobileMenuOpen={setMobileMenuOpen}
+        onNavigateHome={() => navigate('/')}
+        onNavigateLogin={() => navigate('/login')}
+        onNavigateSignup={() => navigate('/signup')}
+        onNavigateDashboard={() => navigate('/dashboard')}
+        onNavigateInvoices={() => navigate('/invoices')}
+        onNavigateSettings={() => navigate('/settings')}
+      />
+      <Hero />
+      <Features />
+      <HowItWorks />
+      <FinalCTA />
+      <Footer />
+    </div>
+  );
+};
 
-  // Add navigation controls for demo purposes
-  React.useEffect(() => {
-    const handleNavigation = (e: PopStateEvent) => {
-      const path = window.location.pathname;
-      if (path === '/login') setCurrentPage('login');
-      else if (path === '/signup') setCurrentPage('signup');
-      else if (path === '/dashboard') setCurrentPage('dashboard');
-      else if (path === '/invoices') setCurrentPage('invoices');
-      else if (path === '/settings') setCurrentPage('settings');
-      else setCurrentPage('home');
-    };
+// Wrapper components for navigation
+const LoginWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return <Login onLogin={() => navigate('/dashboard')} onNavigateHome={() => navigate('/')} />;
+};
 
-    window.addEventListener('popstate', handleNavigation);
-    
-    // Handle initial load
-    const path = window.location.pathname;
-    if (path === '/login') setCurrentPage('login');
-    else if (path === '/signup') setCurrentPage('signup');
-    else if (path === '/dashboard') setCurrentPage('dashboard');
-    else if (path === '/invoices') setCurrentPage('invoices');
-    else if (path === '/settings') setCurrentPage('settings');
+const SignupWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return <Signup onSignup={() => navigate('/dashboard')} onNavigateHome={() => navigate('/')} />;
+};
 
-    return () => window.removeEventListener('popstate', handleNavigation);
-  }, []);
+const DashboardWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <Dashboard 
+      onLogout={() => navigate('/')} 
+      onNavigateToInvoices={() => navigate('/invoices')} 
+      onNavigateToSettings={() => navigate('/settings')}
+      onNavigateToHome={() => navigate('/')}
+    />
+  );
+};
 
-  // Only render the page, no demo navigation
-  return renderPage();
+const InvoicePageWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <InvoicePage 
+      onLogout={() => navigate('/')} 
+      onNavigateToDashboard={() => navigate('/dashboard')} 
+      onNavigateToSettings={() => navigate('/settings')}
+      onNavigateToHome={() => navigate('/')}
+    />
+  );
+};
+
+const AccountSettingsWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <AccountSettings 
+      onLogout={() => navigate('/')} 
+      onNavigateToDashboard={() => navigate('/dashboard')}
+      onNavigateToInvoices={() => navigate('/invoices')}
+      onNavigateHome={() => navigate('/')}
+    />
+  );
+};
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginWrapper />} />
+        <Route path="/signup" element={<SignupWrapper />} />
+        <Route path="/dashboard" element={<DashboardWrapper />} />
+        <Route path="/invoices" element={<InvoicePageWrapper />} />
+        <Route path="/settings" element={<AccountSettingsWrapper />} />
+        {/* Redirect any unknown routes to home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  );
 }
 
 export default App;

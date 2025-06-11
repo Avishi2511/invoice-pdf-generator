@@ -3,9 +3,10 @@ import { Eye, EyeOff, FileText, Mail, Lock, User, Check, X } from 'lucide-react'
 
 interface SignupProps {
   onSignup: () => void;
+  onNavigateHome?: () => void;
 }
 
-const Signup: React.FC<SignupProps> = ({ onSignup }) => {
+const Signup: React.FC<SignupProps> = ({ onSignup, onNavigateHome }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -106,6 +107,7 @@ const Signup: React.FC<SignupProps> = ({ onSignup }) => {
         const data = await res.json();
         if (res.ok) {
           localStorage.setItem('userId', data.user.id);
+          localStorage.setItem('userEmail', data.user.email);
           onSignup(); // Go to dashboard
         } else {
           setErrors(prev => ({ ...prev, api: data.message || 'Signup failed' }));
@@ -130,12 +132,15 @@ const Signup: React.FC<SignupProps> = ({ onSignup }) => {
       <div className="relative max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <div className="flex items-center justify-center space-x-2 mb-6">
+          <button 
+            onClick={onNavigateHome}
+            className="flex items-center justify-center space-x-2 mb-6 mx-auto hover:opacity-80 transition-opacity duration-200"
+          >
             <div className="p-2 bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg">
               <FileText className="h-8 w-8 text-white" />
             </div>
             <span className="text-2xl font-bold text-white">InvoicePro</span>
-          </div>
+          </button>
           <h2 className="text-3xl font-bold text-white mb-2">Create Account</h2>
           <p className="text-gray-400">Join thousands of users</p>
         </div>
